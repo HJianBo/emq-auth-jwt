@@ -84,7 +84,7 @@ do_init_jwks(Options) ->
                          {error, Reason} ->
                              ?LOG(error, "Build JWK failed: {error, ~p}~n", [Reason]),
                              undefined;
-                         J = #jose_jwk{} -> J
+                         J -> J
                      catch T:R:_ ->
                          ?LOG(error, "Build JWK failed: {~p, ~p}~n", [T, R]),
                          undefined
@@ -134,7 +134,7 @@ code_change(_OldVsn, State, _Extra) ->
 handle_verify(JwsCompacted,
               State = #state{static = Static, remote = Remote}) ->
     try
-        Jwks = case emqx_json:decode(jose_jws:peek_protected(JwsCompacted)) of
+        Jwks = case emqx_json:decode(jose_jws:peek_protected(JwsCompacted), [return_maps]) of
                    #{<<"kid">> := Kid} ->
                        [J || J <- Remote, maps:get(<<"kid">>, J#jose_jwk.fields, undefined) =:= Kid];
                    _ -> Static
@@ -154,8 +154,8 @@ request_jwks(Addr) ->
         {error, Reason} ->
             throw({error, Reason});
         {ok, {_Code, _Headers, Body}} ->
-            Jwks = jose_jwk:from(jsx:decode(Body, [return_maps])),
-            Jwks#jose_jwk.keys
+            JwkSet = jose_jwk:from(jsx:decode(Body, [return_maps])),
+            {_, Jwks} = JwkSet#jose_jwk.keys, Jwks
     end.
 
 reset_timer(State = #state{addr = undefined}) ->
