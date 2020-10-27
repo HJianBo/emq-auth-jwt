@@ -4,6 +4,10 @@
   {datatype, string}
 ]}.
 
+{mapping, "auth.jwt.jwks", "emqx_auth_jwt.jwks", [
+  {datatype, string}
+]}.
+
 {mapping, "auth.jwt.from", "emqx_auth_jwt.from", [
   {default, password},
   {datatype, atom}

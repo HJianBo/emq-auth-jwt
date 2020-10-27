@@ -70,15 +70,22 @@ set_special_configs(emqx_auth_jwt) ->
 set_special_configs(_) ->
     ok.
 
+sign(Payload, Alg, Key) ->
+    Jwk = jose_jwk:from_oct(Key),
+    Jwt = emqx_json:encode(Payload),
+    {_, Token} = jose_jws:compact(jose_jwt:sign(Jwk, #{<<"alg">> => Alg}, Jwt)),
+    Token.
+
 %%------------------------------------------------------------------------------
 %% Testcases
 %%------------------------------------------------------------------------------
 
 t_check_auth(_) ->
+
     Plain = #{client_id => <<"client1">>, username => <<"plain">>},
-    Jwt = jwerl:sign([{client_id, <<"client1">>},
-                      {username, <<"plain">>},
-                      {exp, os:system_time(seconds) + 3}], hs256, <<"emqxsecret">>),
+    Jwt = sign([{client_id, <<"client1">>},
+                {username, <<"plain">>},
+                {exp, os:system_time(seconds) + 3}], <<"HS256">>, <<"emqxsecret">>),
     ct:pal("Jwt: ~p~n", [Jwt]),
 
     Result0 = emqx_access_control:authenticate(Plain#{password => Jwt}),
@@ -90,8 +97,8 @@ t_check_auth(_) ->
     ct:pal("Auth result after 1000ms: ~p~n", [Result1]),
     ?assertMatch({error, _}, Result1),
 
-    Jwt_Error = jwerl:sign([{client_id, <<"client1">>},
-                            {username, <<"plain">>}], hs256, <<"secret">>),
+    Jwt_Error = sign([{client_id, <<"client1">>},
+                      {username, <<"plain">>}], <<"HS256">>, <<"secret">>),
     ct:pal("invalid jwt: ~p~n", [Jwt_Error]),
     Result2 = emqx_access_control:authenticate(Plain#{password => Jwt_Error}),
     ct:pal("Auth result for the invalid jwt: ~p~n", [Result2]),
@@ -101,15 +108,15 @@ t_check_auth(_) ->
 t_check_claims(_) ->
     application:set_env(emqx_auth_jwt, verify_claims, [{sub, <<"value">>}]),
     Plain = #{client_id => <<"client1">>, username => <<"plain">>},
-    Jwt = jwerl:sign([{client_id, <<"client1">>},
-                      {username, <<"plain">>},
-                      {sub, value},
-                      {exp, os:system_time(seconds) + 3}], hs256, <<"emqxsecret">>),
+    Jwt = sign([{client_id, <<"client1">>},
+                {username, <<"plain">>},
+                {sub, value},
+                {exp, os:system_time(seconds) + 3}], <<"HS256">>, <<"emqxsecret">>),
     Result0 = emqx_access_control:authenticate(Plain#{password => Jwt}),
     ct:pal("Auth result: ~p~n", [Result0]),
     ?assertMatch({ok, #{auth_result := success, jwt_claims := _}}, Result0),
-    Jwt_Error = jwerl:sign([{client_id, <<"client1">>},
-                            {username, <<"plain">>}], hs256, <<"secret">>),
+    Jwt_Error = sign([{client_id, <<"client1">>},
+                      {username, <<"plain">>}], <<"HS256">>, <<"secret">>),
     Result2 = emqx_access_control:authenticate(Plain#{password => Jwt_Error}),
     ct:pal("Auth result for the invalid jwt: ~p~n", [Result2]),
     ?assertEqual({error, invalid_signature}, Result2).
@@ -117,14 +124,14 @@ t_check_claims(_) ->
 t_check_claims_clientid(_) ->
     application:set_env(emqx_auth_jwt, verify_claims, [{client_id, <<"%c">>}]),
     Plain = #{client_id => <<"client23">>, username => <<"plain">>},
-    Jwt = jwerl:sign([{client_id, <<"client23">>},
-                      {username, <<"plain">>},
-                      {exp, os:system_time(seconds) + 3}], hs256, <<"emqxsecret">>),
+    Jwt = sign([{client_id, <<"client23">>},
+                {username, <<"plain">>},
+                {exp, os:system_time(seconds) + 3}], <<"HS256">>, <<"emqxsecret">>),
     Result0 = emqx_access_control:authenticate(Plain#{password => Jwt}),
     ct:pal("Auth result: ~p~n", [Result0]),
     ?assertMatch({ok, #{auth_result := success, jwt_claims := _}}, Result0),
-    Jwt_Error = jwerl:sign([{client_id, <<"client1">>},
-                            {username, <<"plain">>}], hs256, <<"secret">>),
+    Jwt_Error = sign([{client_id, <<"client1">>},
+                      {username, <<"plain">>}], <<"HS256">>, <<"secret">>),
     Result2 = emqx_access_control:authenticate(Plain#{password => Jwt_Error}),
     ct:pal("Auth result for the invalid jwt: ~p~n", [Result2]),
     ?assertEqual({error, invalid_signature}, Result2).
@@ -132,14 +139,14 @@ t_check_claims_clientid(_) ->
 t_check_claims_username(_) ->
     application:set_env(emqx_auth_jwt, verify_claims, [{username, <<"%u">>}]),
     Plain = #{client_id => <<"client23">>, username => <<"plain">>},
-    Jwt = jwerl:sign([{client_id, <<"client23">>},
-                      {username, <<"plain">>},
-                      {exp, os:system_time(seconds) + 3}], hs256, <<"emqxsecret">>),
+    Jwt = sign([{client_id, <<"client23">>},
+                {username, <<"plain">>},
+                {exp, os:system_time(seconds) + 3}], <<"HS256">>, <<"emqxsecret">>),
     Result0 = emqx_access_control:authenticate(Plain#{password => Jwt}),
     ct:pal("Auth result: ~p~n", [Result0]),
     ?assertMatch({ok, #{auth_result := success, jwt_claims := _}}, Result0),
-    Jwt_Error = jwerl:sign([{client_id, <<"client1">>},
-                            {username, <<"plain">>}], hs256, <<"secret">>),
+    Jwt_Error = sign([{client_id, <<"client1">>},
+                       {username, <<"plain">>}], <<"HS256">>, <<"secret">>),
     Result3 = emqx_access_control:authenticate(Plain#{password => Jwt_Error}),
     ct:pal("Auth result for the invalid jwt: ~p~n", [Result3]),
     ?assertEqual({error, invalid_signature}, Result3).
